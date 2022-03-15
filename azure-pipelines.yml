@@ -16,3 +16,17 @@ steps:
   inputs:
     version: 5.x
 
+#installazione di Directx
+
+#aggiunta VSBuild
+- task: VSBuild@1
+  inputs:
+    solution: '**\*.sln' 
+    vsVersion: 'latest'
+    platform: 'x64'
+    configuration: '$(buildConfiguration)'
+    msbuildArchitecture: 'x64'
+    logProjectEvents: true
+    createLogFile: false
+    logFileVerbosity: 'diagnostic'
+
