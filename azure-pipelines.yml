@@ -7,13 +7,7 @@ trigger:
 
 pool:
   vmImage: windows-latest
-  demands:
-  - directx
-  - steamworks
-  - msbuild
-  - visualstudio
 
-#
 #processo di prebuild
 steps:
 #installazione .NET
