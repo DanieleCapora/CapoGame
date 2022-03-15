@@ -1,0 +1,23 @@
+# Starter pipeline
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: windows-latest
+  demands:
+  - directx
+  - steamworks
+  - msbuild
+  - visualstudio
+
+#processo di prebuild
+steps:
+#installazione .NET
+- task: UseDotNet@2
+  displayName: Use .NET SDK 5.x
+  inputs:
+    version: 5.x
+
