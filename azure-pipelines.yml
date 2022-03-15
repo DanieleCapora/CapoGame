@@ -36,3 +36,10 @@ steps:
     createLogFile: false
     logFileVerbosity: 'diagnostic'
 
+- task: DotNetCoreCLI@2
+  displayName: Build the project - Release
+  inputs:
+    command: build
+    arguments: --no-restore --configuration Release --output "$(percorsoPostBuild)"
+    projects: '$(percorsoPreBuild)'
+
