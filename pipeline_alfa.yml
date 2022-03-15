@@ -1,0 +1,144 @@
+# ASP.NET Core
+# Build and test ASP.NET Core projects targeting .NET Core.
+# Add steps that run tests, create a NuGet package, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- '*'
+
+pool:
+  vmImage: windows-latest
+  demands:
+  - directx
+  - steamworks
+  - msbuild
+  - visualstudio
+
+#Dichiarazione delle variabili utilizzate nella pipeline
+variables:
+  percorsoFile: '../home/game'
+  percorsoPreBuild: '../home/gameDirectory'
+  percorsoPostBuild: '../home/gameDirectory2'
+
+  buildConfiguration: 'Release'
+  percorsoFileISO: '**/percorsoFileISO'
+  
+  account_name_steam: pinuzzo
+  password_steam: "123456798"
+
+
+  percorsoReleaseSteam: '**/release/steam'
+  percorsoReleaseIso: '**/release/dvd'
+  pesoMassimo: '17408'
+
+  postTypeIG: post
+  tagsPostIG: ''
+  placePostIG: ''
+
+  playlistVideoYT: samplePlaylist1
+  familyFriendlyYT: true
+
+#processo di prebuild
+steps:
+#installazione .NET
+- task: UseDotNet@2
+  displayName: Use .NET SDK 5.x
+  inputs:
+    version: 5.x
+
+#installazione di Directx
+- task: Directx@1
+  displayName: Install Directx
+  inputs:
+   verbose: true
+
+#aggiunta VSBuild
+- task: VSBuild@1
+  inputs:
+    solution: '**\*.sln' 
+    vsVersion: 'latest'
+    platform: 'x64'
+    configuration: '$(buildConfiguration)'
+    msbuildArchitecture: 'x64'
+    logProjectEvents: true
+    createLogFile: false
+    logFileVerbosity: 'diagnostic'
+
+- task: DotNetCoreCLI@2
+  displayName: Build the project - Release
+  inputs:
+    command: build
+    arguments: --no-restore --configuration Release --output "$(percorsoPostBuild)"
+    projects: '$(percorsoPreBuild)'
+
+#processo di build
+#punto 2: build del gioco da eseguire dopo la prebuild e il controllo degli assets
+- script: dotnet build --configuration $(buildConfiguration) --input $(percorsoPreBuild) --output $(percorsoPostBuild)
+  displayName: 'dotnet build $(buildConfiguration)'
+  executionGroup: 1
+
+#fase controllo coerenza file audio/video
+#tasks controllo coerenza da creare
+- task: ControlloCoerenza@1
+  displayName: Controllo Coerenza assets grafici
+  workingDirectory: "$(percorsoFile)/assets/grafica"
+
+- task: ControlloCoerenza@2
+  displayName: Controllo Coerenza assets audio
+  workingDirectory: "$(percorsoFile)/assets/audio"
+
+#fase di publish
+#installazione di steamworks per la pubblicazione su steam
+- script: sudo install steamworks.sdk
+  displayName: Installare steamwork.sdk
+  inputs:
+    verbose: true
+# --> PUNTO 3a: CREO UN FILE TXT IN CUI METTO IL PESO DELLA DIRECTORY DEL GIOCO
+#scrivo uno script che crea un file di testo chiamato infoPeso.txt dove inserisce in Byte il peso della directory /home/gamedirectory e controllo se il peso è minore del peso Massimo
+- script: du -h '$(percorsoPreBuild)' -printf '%s'> infoPeso.txt
+  displayName: acquisizione informazioni peso prima del Publish
+  rules: 
+    if: 'cat infoPeso.txt -lt "$(pesoMassimo)"'
+    when: always
+
+# --> PUNTO 4a: CREO IL FILE DI CONFIGURAZIONE .vdf PER STEAMCMD
+#creo tramite script il file di configurazione configGame.vdf e lo inserisco nella cartella home/gamedirectory/
+- script: echo -e '\"AppBuild\" \n   {
+     \"AppID\" "1000" \n #l'app ID del gioco 
+     \"Desc\" \n
+     \"Config file for building the game\" \n #descrizione di questa build\\
+     \"ContentRoot\" \"$(percorsoPreBuild)\" \n #root contenente la cartella relativa al gioco
+     \"BuildOutput\" \"$(percorsoPostBuild)\" \n #cartella di build output per i build logs e build cache files
+     \"Deports\"  {\"1001\" \n { \"FileMapping\" \n {
+
+    \"LocalPath\" \"*\" \n #tutti i file dalla cartella contentroot
+     \"DeportPath\" \".\" \n #mapped into the root of the deport
+      \"recursive\" \"1\" \n }}}}  > "$(percorsoReleaseSteam)/configGame.vdf"' #recursive include tutte le sottocarteller
+  displayName: Creare il file di configurazione
+  executionGroup: 2
+
+# --> PUNTO 4c: CARICO IL GIOCO SU STEAM
+
+#inserire anche le variabili di nome utente e password
+- script: tools\ContentBuilder\builder\steamcmd + login <"$(account_name_steam)"> <"$(password_steam)"> + run_app_build $(percorsoPreBuild)/configGame.vdf + quit
+  displaName: carico il gioco
+  executionGroup: 3
+
+# --> PUNTO 5a: CREAZIONE DI UN ARTEFATTO ISO
+#script che prende tutto quello che c'è nella directory $(percorsoPreBuild) e lo mette in una ISO che chiama game.iso
+- script: mkisofs -o game.iso $(percorsoPreBuild)  # --> mkisofs -o [nomefile.iso] [percorso_directory]
+  displayName: Trasformazione del progetto in un artefatto .iso
+  executionGroup: 3
+
+#punto 6: Pubblicazione video yt/ immagini su social media (da fare in parallelo con il punto 2)
+- task: PubblicazioneTrailerVideo@1
+  displayName: pubblicazione Trailer
+  inputs:
+    arguments: -credenziali '$(percorsoFile)'/MaterialePubblicitario/credenzialiYT.txt -video '$(percorsoFile)'/MaterialePubblicitario/VideoYT.mp4 -titolo '$(percorsoFile)'/MaterialePubblicitario/titolo.txt -descrizione '$(percorsoFile)'/MaterialePubblicitario/descrizioneVideo.txt -playlist '$(playlistVideoYT)' -familyFriendly '$(familyFriendlyYT)'
+  executionGroup: 1
+
+- task: PubblicazionePostInstagram@1
+  displayName: pubblicazione Post
+  inputs:
+    arguments: -credenziali '$(percorsoFile)'/MaterialePubblicitario/credenzialiIG.txt -immagine '$(percorsoFile)'/MaterialePubblicitario/img.png -postType '$(postTypeIG)' -descrizione '$(percorsoFile)'/MaterialePubblicitario/descrizionePost.txt -tags $(tagsPostIG) -place $(placePostIG)
+  executionGroup: 1
