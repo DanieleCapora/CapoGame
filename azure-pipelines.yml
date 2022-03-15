@@ -7,6 +7,8 @@ trigger:
 
 variables:
  buildConfiguration: 'Release'
+  percorsoPreBuild: '../gameDirectory'
+
 
 pool:
   vmImage: windows-2019
