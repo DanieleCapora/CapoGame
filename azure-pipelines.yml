@@ -7,7 +7,8 @@ trigger:
 
 variables:
  buildConfiguration: 'Release'
-  percorsoPreBuild: '../gameDirectory'
+ percorsoPreBuild: '../directoryPreBuild'
+ percorsoPostBuild: '../DirectoryPostBuild'
 
 
 pool:
@@ -38,7 +39,7 @@ steps:
     createLogFile: false
     logFileVerbosity: 'diagnostic'
 
-- task: DotNetCoreCLI@2
+- task: DotNetCoreCLI@1
   displayName: Build the project - Release
   inputs:
     command: build
